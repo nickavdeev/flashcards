@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Flashcards</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="/static/css/common.css" />
+    <link rel="stylesheet" href="/static/css/deck.css" />
+  </head>
+  <body>
+    <header>
+      <a href="/">← Back to Deck List</a>
+    </header>
+
+    <div id="mode-label"></div>
+    <div id="app"></div>
+
+    <script type="module">
+      import { loadNext } from "../static/js/deck.js";
+      import { getDeckIdFromPath } from "../static/js/common.js";
+
+      const deckId = getDeckIdFromPath();
+      loadNext(deckId);
+    </script>
+  </body>
+</html>

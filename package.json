@@ -1,0 +1,19 @@
+{
+  "name": "flashcards",
+  "version": "1.0.0",
+  "description": "Simple flashcard application for learning and memorization. Set up the app, create decks, and review cards.",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "lint:check": "prettier --check static/ templates/",
+    "lint:fix": "prettier --write static/ templates/"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "prettier": "^3.9.6"
+  }
+}
