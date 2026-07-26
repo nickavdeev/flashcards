@@ -2,6 +2,9 @@
 
 Simple flashcard application for learning and memorization. Set up the app, create decks, and review cards.
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Tests](https://github.com/nickavdeev/flashcards/actions/workflows/tests.yml/badge.svg)](https://github.com/nickavdeev/flashcards/actions/workflows/tests.yml)
+
 ## Tech stack
 
 Minimal Flask UI + a JSON API.
