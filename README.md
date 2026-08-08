@@ -2,8 +2,8 @@
 
 Simple flashcard application for learning and memorization. Set up the app, create decks, and review cards.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Tests](https://github.com/nickavdeev/flashcards/actions/workflows/tests.yml/badge.svg)](https://github.com/nickavdeev/flashcards/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## Tech stack
 
@@ -59,15 +59,18 @@ By default the app is served at `http://localhost:5000`.
 
 All API routes are prefixed with `/api/v1`.
 
-| Method | Endpoint                          | Description                                 |
-| ------ | --------------------------------- | ------------------------------------------- |
-| GET    | `/decks`                          | List all decks                              |
-| GET    | `/deck/<deck_id>/cards/next`      | Get the next card due for review in a deck  |
-| POST   | `/cards/<card_id>/review?result=` | Submit a review result (`know` or `revise`) |
-| POST   | `/deck/<deck_id>/reset`           | Reset review progress for a deck            |
-| GET    | `/health`                         | Health check, verifies the Service health   |
+| Method | Endpoint                          | Description                                          |
+| ------ |-----------------------------------|------------------------------------------------------|
+| GET    | `/decks`                          | List all decks                                       |
+| GET    | `/deck/<deck_id>/cards/next`      | Get the next card due for review in a deck           |
+| POST   | `/cards/<card_id>/review?result=` | Submit a review result (`know` or `revise`)          |
+| POST   | `/deck/<deck_id>/reset`           | Reset review progress for a deck                     |
+| POST   | `/request-code`                   | Request a login code to be sent to the email address |
+| POST   | `/login`                          | Login with a code received via email                 |
+| POST   | `/logout`                         | Logout the current user                              |
+| GET    | `/health`                         | Health check, verifies the Service health            |
 
-Page routes (`/`, `/deck/<deck_id>`) serve the HTML UI.
+Page routes (`/`, `/login`, `/deck/<deck_id>`) serve the HTML UI.
 
 ## Running tests
 

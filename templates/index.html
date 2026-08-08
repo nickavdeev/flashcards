@@ -9,14 +9,26 @@
     <link rel="stylesheet" href="/static/css/index.css" />
   </head>
   <body>
+    <header>
+      <form id="logout-form">
+        <button type="submit">Log out</button>
+      </form>
+    </header>
+
     <h1>Flashcards App</h1>
     <h4>Available Decks</h4>
     <div id="deck-list"></div>
 
     <script type="module">
       import { loadDecks } from "../static/js/index.js";
+      import { logout } from "../static/js/common.js";
 
       loadDecks();
+
+      document.getElementById("logout-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        logout();
+      });
     </script>
   </body>
 </html>

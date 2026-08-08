@@ -1,7 +1,12 @@
 import logging
+from datetime import datetime, timedelta
 from enum import StrEnum
 
+import pytz
+
 from database import Database
+from service.login import LoginService
+from service.notifications import NotificationsService
 from service.responses import ErrorCode, ErrorResponse, ServiceResponse, SuccessResponse
 
 logger = logging.getLogger(__name__)
@@ -14,7 +19,7 @@ class ProgressResult(StrEnum):
     REVISE = "revise"
 
 
-class Service:
+class Service(LoginService, NotificationsService):
     """Service class for handling flashcard operations."""
 
     def __init__(self, db=None):
@@ -73,6 +78,43 @@ class Service:
     def reset_progress(self, deck_id: int) -> ServiceResponse:
         self.db.reset_deck_progress(deck_id)
         return SuccessResponse()
+
+    @error_handler
+    def verify_login_code(self, email: str, code: str) -> ServiceResponse:
+        entry = self.db.get_login_code(email)
+        if not entry or datetime.fromisoformat(entry["expires_at"]) < datetime.now(pytz.utc):
+            return ErrorResponse("Invalid or expired code", ErrorCode.UNAUTHORIZED)
+        if entry["attempts"] >= self.MAX_ATTEMPTS:
+            return ErrorResponse("Maximum attempts exceeded", ErrorCode.TOO_MANY_REQUESTS)
+
+        self.db.increment_login_code_attempts(entry["id"])
+
+        if entry["code_hash"] != self._hash_code(code, email):
+            return ErrorResponse("Invalid code", ErrorCode.UNAUTHORIZED)
+
+        self.db.set_login_code_used(entry["id"])
+
+        user = self.db.get_user_by_email(email)
+        if not user:
+            logger.warning(f"User with email {email} not found. Registration is limited at this moment.")
+            return ErrorResponse("User not found", ErrorCode.NOT_FOUND)
+
+        return SuccessResponse({"id": user["id"], "email": user["email"]})
+
+    @error_handler
+    def send_login_code(self, email: str) -> ServiceResponse:
+        code = self._generate_code()
+        hashed_code = self._hash_code(code, email)
+        expires_at = datetime.now(pytz.utc) + timedelta(minutes=self.CODE_TTL_MINUTES)
+        self.db.add_login_code(email, hashed_code, expires_at)
+
+        try:
+            self._send_code_via_email(email, code)
+        except Exception as e:
+            logger.error(f"Failed to send login code to {email}: {e}")
+            return ErrorResponse("Failed to send login code", ErrorCode.INTERNAL_ERROR)
+
+        return SuccessResponse(message="Login code sent successfully")
 
     def health_check(self) -> ServiceResponse:
         """Check the health of the service by verifying the database connection."""

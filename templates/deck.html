@@ -10,18 +10,27 @@
   </head>
   <body>
     <header>
-      <a href="/">← Back to Deck List</a>
+      <form id="logout-form">
+        <button type="submit">Log out</button>
+      </form>
     </header>
+
+    <a href="/">← Back to Deck List</a>
 
     <div id="mode-label"></div>
     <div id="app"></div>
 
     <script type="module">
       import { loadNext } from "../static/js/deck.js";
-      import { getDeckIdFromPath } from "../static/js/common.js";
+      import { getDeckIdFromPath, logout } from "../static/js/common.js";
 
       const deckId = getDeckIdFromPath();
       loadNext(deckId);
+
+      document.getElementById("logout-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        logout();
+      });
     </script>
   </body>
 </html>

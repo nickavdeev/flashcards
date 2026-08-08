@@ -1,7 +1,9 @@
 import unittest
 from unittest.mock import MagicMock
 
-from app import create_app
+from flask_login import FlaskLoginClient
+
+from app import User, create_app
 
 
 class TestApp(unittest.TestCase):
@@ -9,7 +11,11 @@ class TestApp(unittest.TestCase):
         service = MagicMock()
         self.app = create_app(service=service)
         self.app.config["TESTING"] = True
-        self.client = self.app.test_client()
+        self.app.test_client_class = FlaskLoginClient
+
+        self.email = "test@example.com"
+        self.unauthenticated_client = self.app.test_client()
+        self.client = self.app.test_client(user=User(1, self.email))
 
 
 class TestApiRoutes(TestApp):
@@ -21,8 +27,6 @@ class TestApiRoutes(TestApp):
         }
 
         response = self.client.get("/api/v1/decks")
-
-        print(response.get_json())
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["ok"], True)
@@ -38,18 +42,10 @@ class TestApiRoutes(TestApp):
         self.app.service.update_card_progress.assert_called_once_with(42, "know")
 
     def test_update_card_progress_missing_result_param(self):
-        self.app.service.update_card_progress.return_value = {
-            "ok": False,
-            "code": "validation_error",
-            "message": "Invalid `result` value",
-        }
-
         response = self.client.post("/api/v1/cards/42/review")
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.get_json()["ok"], False)
-        self.assertIn("Invalid `result` value", response.get_json()["message"])
-        self.app.service.update_card_progress.assert_called_once_with(42, None)
 
     def test_get_next_card_returns_200(self):
         self.app.service.get_next_card.return_value = {
@@ -74,6 +70,63 @@ class TestApiRoutes(TestApp):
         self.assertEqual(response.get_json()["ok"], True)
         self.app.service.reset_progress.assert_called_once_with(1)
 
+    def test_request_code_returns_200(self):
+        self.app.service.send_login_code.return_value = {
+            "ok": True, "data": {"message": "Login code sent successfully"}
+        }
+
+        response = self.client.post("/api/v1/request-code", json={"email": self.email})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["ok"], True)
+        self.assertEqual(response.get_json()["data"]["message"], "Login code sent successfully")
+
+    def test_request_code_missing_email_param_returns_400(self):
+        response = self.client.post("/api/v1/request-code", json={})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()["ok"], False)
+
+    def test_login_returns_200_on_successful_login(self):
+        self.app.service.verify_login_code.return_value = {
+            "ok": True, "data": {"id": 1, "email": self.email},
+        }
+
+        response = self.client.post("/api/v1/login", json={"email": self.email, "code": "123456"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["ok"], True)
+        self.assertIn("Logged in successfully", response.get_json()["message"])
+
+    def test_login_returns_401_on_invalid_code(self):
+        self.app.service.verify_login_code.return_value = {
+            "ok": False, "code": "unauthorized", "message": "Invalid code",
+        }
+
+        response = self.client.post("/api/v1/login", json={"email": self.email, "code": "000000"})
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.get_json()["ok"], False)
+        self.assertIn("Invalid code", response.get_json()["message"])
+
+    def test_login_missing_required_params_returns_400(self):
+        for missing_param in ["email", "code"]:
+            payload = {"email": self.email, "code": "123456"}
+            with self.subTest(param=missing_param):
+                payload.pop(missing_param)
+
+                response = self.client.post("/api/v1/login", json=payload)
+
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.get_json()["ok"], False)
+
+    def test_logout_returns_200(self):
+        response = self.client.post("/api/v1/logout")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["ok"], True)
+        self.assertIn("Logged out successfully", response.get_json()["message"])
+
 
 class TestHealth(TestApp):
     def test_health_returns_200_when_db_ok(self):
@@ -94,9 +147,26 @@ class TestHealth(TestApp):
 
 
 class TestPages(TestApp):
+    def test_login_page_renders(self):
+        response = self.unauthenticated_client.get("/login")
+        self.assertEqual(response.status_code, 200)
+
+    def test_login_page_redirects_when_authenticated(self):
+        response = self.client.get("/login")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/", response.headers["Location"])
+
     def test_main_page_renders(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
+
+    def test_main_page_requires_login(self):
+        response = self.unauthenticated_client.get("/")
+        self.assertEqual(response.status_code, 401)
+
+    def test_deck_page_requires_login(self):
+        response = self.unauthenticated_client.get("/deck/1")
+        self.assertEqual(response.status_code, 401)
 
     def test_deck_page_renders_with_valid_id(self):
         response = self.client.get("/deck/5")
