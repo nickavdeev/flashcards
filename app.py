@@ -133,9 +133,10 @@ class FlashcardsApp(Flask):
         return render_template("deck.html")
 
     @staticmethod
-    @login_required
     def main_page():
-        return render_template("index.html")
+        if not current_user.is_authenticated:
+            return render_template("index.html")
+        return render_template("decks.html")
 
     def health(self):
         if not self.service.health_check():

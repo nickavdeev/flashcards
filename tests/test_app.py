@@ -156,13 +156,12 @@ class TestPages(TestApp):
         self.assertEqual(response.status_code, 302)
         self.assertIn("/", response.headers["Location"])
 
-    def test_main_page_renders(self):
-        response = self.client.get("/")
+    def test_main_page_renders_for_all_users(self):
+        response = self.unauthenticated_client.get("/")
         self.assertEqual(response.status_code, 200)
 
-    def test_main_page_requires_login(self):
-        response = self.unauthenticated_client.get("/")
-        self.assertEqual(response.status_code, 401)
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
 
     def test_deck_page_requires_login(self):
         response = self.unauthenticated_client.get("/deck/1")

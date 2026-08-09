@@ -52,8 +52,8 @@ export async function verifyCode(email, code) {
 export async function logout() {
   const response = await apiPost(`logout`);
   if (response.ok) {
-    alert("Logged out successfully! Redirecting to the login page...");
-    window.location.href = "/login";
+    alert("Logged out successfully! Redirecting to the main page...");
+    window.location.href = "/";
   } else {
     alert(response.message || "Logout failed. Please try again.");
   }
