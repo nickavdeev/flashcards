@@ -92,3 +92,11 @@ JS and HTML:
 npx prettier --check static/ templates/
 npx prettier --write static/ templates/
 ```
+
+## Email setup
+To send login codes via email, you need to set up an SMTP server. By default, the app uses [Mailgun](https://www.mailgun.com/) with the following environment variables:
+
+```
+MAIL_API_KEY=string
+MAIL_DOMAIN=example.com
+```
