@@ -19,11 +19,12 @@ class ProgressResult(StrEnum):
     REVISE = "revise"
 
 
-class Service(LoginService, NotificationsService):
+class Service(LoginService):
     """Service class for handling flashcard operations."""
 
     def __init__(self, db=None):
         self.db = db or Database()
+        self.notifications = NotificationsService()
 
     @staticmethod
     def error_handler(func):
@@ -96,7 +97,7 @@ class Service(LoginService, NotificationsService):
 
         user = self.db.get_user_by_email(email)
         if not user:
-            logger.warning(f"User with email {email} not found. Registration is limited at this moment.")
+            logger.warning("User not found. Registration is limited at this moment.")
             return ErrorResponse("User not found", ErrorCode.NOT_FOUND)
 
         return SuccessResponse({"id": user["id"], "email": user["email"]})
@@ -108,18 +109,17 @@ class Service(LoginService, NotificationsService):
         expires_at = datetime.now(pytz.utc) + timedelta(minutes=self.CODE_TTL_MINUTES)
         self.db.add_login_code(email, hashed_code, expires_at)
 
-        try:
-            self._send_code_via_email(email, code)
-        except Exception as e:
-            logger.error(f"Failed to send login code to {email}: {e}")
-            return ErrorResponse("Failed to send login code", ErrorCode.INTERNAL_ERROR)
+        self.notifications.send_verification_code(email, code)
 
         return SuccessResponse(message="Login code sent successfully")
 
     def health_check(self) -> ServiceResponse:
-        """Check the health of the service by verifying the database connection."""
+        """Check the health of the service."""
 
         if not self.db.health_check():
             logger.error("Database connection failed.")
             return ErrorResponse("Database connection failed", ErrorCode.INTERNAL_ERROR)
+        if not self.notifications.health_check():
+            logger.error("Notifications service health check failed.")
+            return ErrorResponse("Notifications service health check failed", ErrorCode.INTERNAL_ERROR)
         return SuccessResponse()

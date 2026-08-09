@@ -132,7 +132,9 @@ class TestUserLogin(TestService):
         self.assertEqual("Database error", response["message"])
 
     def test_send_login_code_email_error(self):
-        self.service._send_code_via_email = MagicMock(side_effect=Exception("Email sending error"))
+        self.service.notifications.send_verification_code = MagicMock(
+            side_effect=Exception("Failed to send login code")
+        )
 
         response = self.service.send_login_code(email=self.email)
 
@@ -227,3 +229,50 @@ class TestUserLogin(TestService):
         self.assertEqual(response["ok"], False)
         self.assertEqual(response["code"], "internal_error")
         self.assertEqual("Database error", response["message"])
+
+
+class TestNotifications(TestService):
+    def test_send_verification_code_success(self):
+        self.service.notifications._send_email = MagicMock()
+
+        self.service.send_login_code(email=self.email)
+
+        self.service.notifications._send_email.assert_called_once()
+
+    def test_send_verification_code_failure(self):
+        self.service.notifications._send_email = MagicMock(side_effect=Exception("Failed to send email"))
+
+        response = self.service.send_login_code(email=self.email)
+
+        self.assertEqual(response["ok"], False)
+        self.assertEqual(response["code"], "internal_error")
+        self.assertEqual("Failed to send email", response["message"])
+
+
+class TestHealthCheck(TestService):
+    def test_health_check_success(self):
+        self.mock_db.health_check.return_value = True
+        self.service.notifications.health_check = MagicMock(return_value=True)
+
+        response = self.service.health_check()
+
+        self.assertEqual(response["ok"], True)
+
+    def test_health_check_db_failure(self):
+        self.mock_db.health_check.return_value = False
+
+        response = self.service.health_check()
+
+        self.assertEqual(response["ok"], False)
+        self.assertEqual(response["code"], "internal_error")
+        self.assertEqual("Database connection failed", response["message"])
+
+    def test_health_check_notifications_failure(self):
+        self.mock_db.health_check.return_value = True
+        self.service.notifications.health_check = MagicMock(return_value=False)
+
+        response = self.service.health_check()
+
+        self.assertEqual(response["ok"], False)
+        self.assertEqual(response["code"], "internal_error")
+        self.assertEqual("Notifications service health check failed", response["message"])
