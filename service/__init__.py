@@ -104,6 +104,9 @@ class Service(LoginService):
 
     @error_handler
     def send_login_code(self, email: str) -> ServiceResponse:
+        if not self.db.get_user_by_email(email):
+            return ErrorResponse("User not found", ErrorCode.NOT_FOUND)
+
         code = self._generate_code()
         hashed_code = self._hash_code(code, email)
         expires_at = datetime.now(pytz.utc) + timedelta(minutes=self.CODE_TTL_MINUTES)

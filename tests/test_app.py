@@ -87,6 +87,17 @@ class TestApiRoutes(TestApp):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.get_json()["ok"], False)
 
+    def test_request_code_rate_limit_exceeded_returns_429(self):
+        for _ in range(5):
+            self.app.service.send_login_code.return_value = {
+                "ok": True, "data": {"message": "Login code sent successfully"}
+            }
+            self.client.post("/api/v1/request-code", json={"email": self.email})
+
+        response = self.client.post("/api/v1/request-code", json={"email": self.email})
+
+        self.assertEqual(response.status_code, 429)
+
     def test_login_returns_200_on_successful_login(self):
         self.app.service.verify_login_code.return_value = {
             "ok": True, "data": {"id": 1, "email": self.email},
@@ -130,7 +141,7 @@ class TestApiRoutes(TestApp):
 
 class TestHealth(TestApp):
     def test_health_returns_200_when_db_ok(self):
-        self.app.service.health_check.return_value = True
+        self.app.service.health_check.return_value = {"ok": True, "status_code": 200}
 
         response = self.client.get("/health")
 
@@ -138,7 +149,7 @@ class TestHealth(TestApp):
         self.assertEqual(response.data, b"OK")
 
     def test_health_returns_500_when_service_unavailable(self):
-        self.app.service.health_check.return_value = False
+        self.app.service.health_check.return_value = {"ok": False, "status_code": 500}
 
         response = self.client.get("/health")
 
@@ -173,4 +184,8 @@ class TestPages(TestApp):
 
     def test_deck_page_rejects_non_integer_id(self):
         response = self.client.get("/deck/not-an-integer")
+        self.assertEqual(response.status_code, 404)
+
+    def test_nonexistent_page_returns_404(self):
+        response = self.client.get("/nonexistent-page")
         self.assertEqual(response.status_code, 404)
