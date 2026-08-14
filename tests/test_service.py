@@ -117,6 +117,8 @@ class TestResetProgress(TestService):
 
 class TestUserLogin(TestService):
     def test_send_login_code_success(self):
+        self.service.notifications._send_email = MagicMock()
+
         response = self.service.send_login_code(email=self.email)
 
         self.assertEqual(response["ok"], True)
