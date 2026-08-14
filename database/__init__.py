@@ -98,3 +98,33 @@ class Database:
             (deck_id,),
         )
         self._execute_query(query, params)
+
+    def get_user_by_email(self, email):
+        query, params = "SELECT id, email FROM users WHERE email = ?", (email,)
+        return self._fetch_data(query, params, fetch_one=True)
+
+    def add_login_code(self, email, code, expires_at):
+        query, params = (
+            "INSERT INTO login_codes (email, code_hash, expires_at) VALUES (?, ?, ?)",
+            (email, code, expires_at),
+        )
+        self._execute_query(query, params)
+
+    def get_login_code(self, email):
+        query, params = (
+            """
+            SELECT id, code_hash, attempts, expires_at FROM login_codes
+            WHERE email = ? AND used = 0
+            ORDER BY expires_at DESC
+            """,
+            (email,),
+        )
+        return self._fetch_data(query, params, fetch_one=True)
+
+    def increment_login_code_attempts(self, code_id):
+        query, params = "UPDATE login_codes SET attempts = attempts + 1 WHERE id = ?", (code_id,)
+        self._execute_query(query, params)
+
+    def set_login_code_used(self, code_id):
+        query, params = "UPDATE login_codes SET used = 1 WHERE id = ?", (code_id,)
+        self._execute_query(query, params)

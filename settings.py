@@ -1,6 +1,9 @@
 import logging
 import logging.config
 
+DEFAULT_RATE_LIMIT = "200 per hour"
+
+
 CONFIG = {
     "version": 1,
     "disable_existing_loggers": False,

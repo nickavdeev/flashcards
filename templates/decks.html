@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <link rel="stylesheet" href="/static/css/common.css" />
-    <link rel="stylesheet" href="/static/css/deck.css" />
+    <link rel="stylesheet" href="/static/css/index.css" />
   </head>
   <body>
     <header>
@@ -15,17 +15,15 @@
       </form>
     </header>
 
-    <a href="/">← Back to Deck List</a>
-
-    <div id="mode-label"></div>
-    <div id="app"></div>
+    <h1>Flashcards App</h1>
+    <h4>Available Decks</h4>
+    <div id="deck-list"></div>
 
     <script type="module">
-      import { loadNext } from "../static/js/deck.js";
-      import { getDeckIdFromPath, logout } from "../static/js/common.js";
+      import { loadDecks } from "../static/js/index.js";
+      import { logout } from "../static/js/common.js";
 
-      const deckId = getDeckIdFromPath();
-      loadNext(deckId);
+      loadDecks();
 
       document.getElementById("logout-form").addEventListener("submit", (e) => {
         e.preventDefault();

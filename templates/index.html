@@ -6,17 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <link rel="stylesheet" href="/static/css/common.css" />
-    <link rel="stylesheet" href="/static/css/index.css" />
   </head>
   <body>
+    <header>
+      <a href="/login"><button>Log in</button></a>
+    </header>
+
     <h1>Flashcards App</h1>
-    <h4>Available Decks</h4>
-    <div id="deck-list"></div>
-
-    <script type="module">
-      import { loadDecks } from "../static/js/index.js";
-
-      loadDecks();
-    </script>
+    <p>A simple flashcard application to help you learn and memorize information.</p>
+    <p>
+      Please, login to explore the available decks. Unfortunately, registration is not available at
+      the moment.
+    </p>
   </body>
 </html>

@@ -1,7 +1,12 @@
 import logging
+from datetime import datetime, timedelta
 from enum import StrEnum
 
+import pytz
+
 from database import Database
+from service.login import LoginService
+from service.notifications import NotificationsService
 from service.responses import ErrorCode, ErrorResponse, ServiceResponse, SuccessResponse
 
 logger = logging.getLogger(__name__)
@@ -14,11 +19,12 @@ class ProgressResult(StrEnum):
     REVISE = "revise"
 
 
-class Service:
+class Service(LoginService):
     """Service class for handling flashcard operations."""
 
     def __init__(self, db=None):
         self.db = db or Database()
+        self.notifications = NotificationsService()
 
     @staticmethod
     def error_handler(func):
@@ -74,10 +80,49 @@ class Service:
         self.db.reset_deck_progress(deck_id)
         return SuccessResponse()
 
+    @error_handler
+    def verify_login_code(self, email: str, code: str) -> ServiceResponse:
+        entry = self.db.get_login_code(email)
+        if not entry or datetime.fromisoformat(entry["expires_at"]) < datetime.now(pytz.utc):
+            return ErrorResponse("Invalid or expired code", ErrorCode.UNAUTHORIZED)
+        if entry["attempts"] >= self.MAX_ATTEMPTS:
+            return ErrorResponse("Maximum attempts exceeded", ErrorCode.TOO_MANY_REQUESTS)
+
+        self.db.increment_login_code_attempts(entry["id"])
+
+        if entry["code_hash"] != self._hash_code(code, email):
+            return ErrorResponse("Invalid code", ErrorCode.UNAUTHORIZED)
+
+        self.db.set_login_code_used(entry["id"])
+
+        user = self.db.get_user_by_email(email)
+        if not user:
+            logger.warning("User not found. Registration is limited at this moment.")
+            return ErrorResponse("User not found", ErrorCode.NOT_FOUND)
+
+        return SuccessResponse({"id": user["id"], "email": user["email"]})
+
+    @error_handler
+    def send_login_code(self, email: str) -> ServiceResponse:
+        if not self.db.get_user_by_email(email):
+            return ErrorResponse("User not found", ErrorCode.NOT_FOUND)
+
+        code = self._generate_code()
+        hashed_code = self._hash_code(code, email)
+        expires_at = datetime.now(pytz.utc) + timedelta(minutes=self.CODE_TTL_MINUTES)
+        self.db.add_login_code(email, hashed_code, expires_at)
+
+        self.notifications.send_verification_code(email, code)
+
+        return SuccessResponse(message="Login code sent successfully")
+
     def health_check(self) -> ServiceResponse:
-        """Check the health of the service by verifying the database connection."""
+        """Check the health of the service."""
 
         if not self.db.health_check():
             logger.error("Database connection failed.")
             return ErrorResponse("Database connection failed", ErrorCode.INTERNAL_ERROR)
+        if not self.notifications.health_check():
+            logger.error("Notifications service health check failed.")
+            return ErrorResponse("Notifications service health check failed", ErrorCode.INTERNAL_ERROR)
         return SuccessResponse()

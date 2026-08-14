@@ -6,6 +6,22 @@ from database import Database
 SCHEMA = """
 PRAGMA foreign_keys = ON;
 
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE login_codes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL,
+    code_hash TEXT NOT NULL,
+    expires_at DATETIME NOT NULL,
+    attempts INTEGER DEFAULT 0,
+    used BOOLEAN DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE decks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -35,6 +51,8 @@ class TestDatabase(unittest.TestCase):
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
         self.db = Database(conn=self.conn)
+
+        self.email = "test@example.com"
 
     def tearDown(self):
         self.conn.close()
@@ -248,3 +266,79 @@ class TestResetDeckProgress(TestDatabase):
 
         self.assertIsNotNone(progress)
         self.assertEqual(progress["last_result"], "revise")
+
+
+class TestUserLogin(TestDatabase):
+    def test_get_user_by_email(self):
+        self.conn.execute("INSERT INTO users (email) VALUES (?)", (self.email,))
+        self.conn.commit()
+
+        user = self.db.get_user_by_email(self.email)
+
+        self.assertIsNotNone(user)
+        self.assertEqual(user["email"], self.email)
+
+    def test_add_login_code(self):
+        code = "hashed_code"
+        expires_at = "2026-01-01T00:00:00Z"
+        self.db.add_login_code(self.email, code, expires_at)
+
+        login_code = self.conn.execute(
+            "SELECT * FROM login_codes WHERE email = ?", (self.email,)
+        ).fetchone()
+
+        self.assertIsNotNone(login_code)
+        self.assertEqual(login_code["code_hash"], code)
+        self.assertEqual(login_code["expires_at"], expires_at)
+
+    def test_get_login_code(self):
+        code = "hashed_code"
+        expires_at = "2026-01-01T00:00:00Z"
+        self.conn.execute(
+            "INSERT INTO login_codes (email, code_hash, expires_at) VALUES (?, ?, ?)",
+            (self.email, code, expires_at),
+        )
+        self.conn.commit()
+
+        login_code = self.db.get_login_code(self.email)
+
+        self.assertIsNotNone(login_code)
+        self.assertEqual(login_code["code_hash"], code)
+        self.assertEqual(login_code["expires_at"], expires_at)
+
+    def test_increment_login_code_attempts(self):
+        code = "hashed_code"
+        expires_at = "2026-01-01T00:00:00Z"
+        self.conn.execute(
+            "INSERT INTO login_codes (email, code_hash, expires_at, attempts) VALUES (?, ?, ?, ?)",
+            (self.email, code, expires_at, 0),
+        )
+        self.conn.commit()
+
+        self.db.increment_login_code_attempts(code_id=1)
+
+        login_code = self.conn.execute(
+            "SELECT * FROM login_codes WHERE email = ?", (self.email,)
+        ).fetchone()
+
+        self.assertIsNotNone(login_code)
+        self.assertEqual(login_code["attempts"], 1)
+
+    def test_set_login_code_used(self):
+        code = "hashed_code"
+        expires_at = "2026-01-01T00:00:00Z"
+        self.conn.execute(
+            "INSERT INTO login_codes (email, code_hash, expires_at, used) VALUES (?, ?, ?, ?)",
+            (self.email, code, expires_at, 0),
+        )
+        self.conn.commit()
+
+        self.db.set_login_code_used(code_id=1)
+
+        login_code = self.conn.execute(
+            "SELECT * FROM login_codes WHERE email = ?", (self.email,)
+        ).fetchone()
+
+        self.assertIsNotNone(login_code)
+        self.assertEqual(login_code["used"], 1)
+
