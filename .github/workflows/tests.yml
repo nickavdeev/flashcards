@@ -59,4 +59,5 @@ jobs:
         env:
           ENVIRONMENT: "testing"
           DATABASE_NAME: ":memory:"
+          SECRET_KEY: "test-secret-key"
         run: uv run python -m unittest discover -s tests -p "test_*.py" -v
