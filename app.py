@@ -74,6 +74,7 @@ class FlashcardsApp(Flask):
             ("/", "main_page", self.main_page),
             ("/deck/<int:deck_id>", "deck_page", self.deck_page),
             ("/login", "login_page", self.login_page),
+            ("/api/docs", "api_docs", self.api_docs),
         ]
         api_v1_routes = [
             ("cards/<int:card_id>/review", self.update_card_progress, ["POST"]),
@@ -82,7 +83,7 @@ class FlashcardsApp(Flask):
             ("deck/<int:deck_id>/reset", self.reset_progress, ["POST"]),
             ("logout", self.logout, ["POST"])
         ]
-        rate_limited_routes = [
+        rate_limited_api_v1_routes = [
             ("request-code", self.request_code, ["POST"], "5 per hour", self._email_or_ip_key),
             ("login", self.login, ["POST"], "10 per 15 minutes", self._email_or_ip_key),
         ]
@@ -94,7 +95,7 @@ class FlashcardsApp(Flask):
             self.add_url_rule(*route)
         for route, func, methods in api_v1_routes:
             self.add_url_rule(f"/api/v1/{route}", view_func=func, methods=methods)
-        for route, func, methods, limit_str, key_func in rate_limited_routes:
+        for route, func, methods, limit_str, key_func in rate_limited_api_v1_routes:
             wrapped = limiter.limit(limit_str, key_func=key_func)(func)
             self.add_url_rule(f"/api/v1/{route}", view_func=wrapped, methods=methods, endpoint=func.__name__)
         for route in monitoring_routes:
@@ -114,7 +115,7 @@ class FlashcardsApp(Flask):
         result = request.args.get("result")
 
         if not result:
-            return self.api_response(ErrorResponse("Result parameter is required", ErrorCode.VALIDATION_ERROR))
+            return self.api_response(ErrorResponse("Parameter `result` is required", ErrorCode.VALIDATION_ERROR))
 
         data = self.service.update_card_progress(card_id, result)
         return self.api_response(data)
@@ -131,7 +132,7 @@ class FlashcardsApp(Flask):
         params = request.get_json()
 
         if not params.get("email"):
-            return self.api_response(ErrorResponse("Email parameter is required", ErrorCode.VALIDATION_ERROR))
+            return self.api_response(ErrorResponse("Parameter `email` is required", ErrorCode.VALIDATION_ERROR))
 
         email = params["email"].strip().lower()
         result = self.service.send_login_code(email)
@@ -140,10 +141,10 @@ class FlashcardsApp(Flask):
     def login(self):
         params = request.get_json()
 
-        if not params.get("email"):
-            return self.api_response(ErrorResponse("Email parameter is required", ErrorCode.VALIDATION_ERROR))
-        if not params.get("code"):
-            return self.api_response(ErrorResponse("Code parameter is required", ErrorCode.VALIDATION_ERROR))
+        if not params.get("email") or not params.get("code"):
+            return self.api_response(
+                ErrorResponse("Parameters `email` and `code` are required", ErrorCode.VALIDATION_ERROR)
+            )
 
         email, code = params["email"].strip().lower(), params["code"].strip()
 
@@ -182,6 +183,10 @@ class FlashcardsApp(Flask):
         if current_user.is_authenticated:
             return redirect(url_for("main_page"))
         return render_template("login.html")
+
+    @staticmethod
+    def api_docs():
+        return render_template("api_docs.html")
 
 
 class AuthManager(LoginManager):

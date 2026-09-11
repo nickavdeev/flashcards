@@ -1,0 +1,413 @@
+openapi: 3.0.3
+info:
+  title: Flashcards API
+  description: JSON API for the Flashcards app.
+  version: 1.0.0
+  contact:
+    name: Nikita Avdeev
+    url: https://avdeev.me
+  license:
+    name: MIT
+    url: https://github.com/nickavdeev/flashcards/blob/main/LICENSE
+servers:
+  - url: /api/v1
+externalDocs:
+  description: Project README
+  url: https://github.com/nickavdeev/flashcards/blob/main/README.md
+
+tags:
+  - name: Login
+    description: Authentication endpoints
+  - name: Cards
+    description: Card review endpoints
+  - name: Decks
+    description: Deck management endpoints
+
+components:
+  schemas:
+    Deck:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+    Card:
+      type: object
+      required:
+        - id
+        - front
+        - back
+      properties:
+        id:
+          type: integer
+        front:
+          type: string
+        back:
+          type: string
+    NextCard:
+      type: object
+      required:
+        - card
+        - deck
+      properties:
+        card:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Card"
+        deck:
+          $ref: "#/components/schemas/Deck"
+    ApiSuccessBase:
+      type: object
+      required:
+        - ok
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        message:
+          type: string
+    DecksResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiSuccessBase"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Deck"
+    NextCardResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiSuccessBase"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/NextCard"
+    ApiErrorResponse:
+      type: object
+      required:
+        - ok
+        - message
+        - code
+      properties:
+        ok:
+          type: boolean
+          enum: [false]
+        message:
+          type: string
+        code:
+          type: string
+          enum: [validation_error, unauthorized, not_found, internal_error]
+    ApiResponse:
+      description: >-
+        Generic response envelope. Use the `ok` field to tell success from error apart:
+        `ok: true` matches ApiSuccessBase (or one of its endpoint-specific extensions,
+        e.g. DecksResponse, NextCardResponse), `ok: false` matches ApiErrorResponse.
+      oneOf:
+        - $ref: "#/components/schemas/ApiSuccessBase"
+        - $ref: "#/components/schemas/ApiErrorResponse"
+  responses:
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiErrorResponse"
+          example:
+            ok: false
+            message: "Internal server error"
+            code: "internal_error"
+
+paths:
+  /decks:
+    get:
+      tags: [Decks]
+      summary: Get all decks
+      operationId: getDecks
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DecksResponse"
+              example:
+                ok: true
+                data:
+                  - id: 1
+                    name: "Deck 1"
+                  - id: 2
+                    name: "Deck 2"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /cards/{card_id}/review:
+    post:
+      tags: [Cards]
+      summary: Review a card
+      operationId: reviewCard
+      parameters:
+        - name: card_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: result
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [know, revise]
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiSuccessBase"
+              example:
+                ok: true
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              examples:
+                missing_result:
+                  value:
+                    ok: false
+                    message: "Parameter `result` is required"
+                    code: "validation_error"
+                invalid_result:
+                  value:
+                    ok: false
+                    message: "Invalid `result` value"
+                    code: "validation_error"
+        "404":
+          description: Card not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                ok: false
+                message: "Card not found"
+                code: "not_found"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /deck/{deck_id}/cards/next:
+    get:
+      tags: [Cards]
+      summary: Get the next card to review in a deck
+      operationId: getNextCard
+      parameters:
+        - name: deck_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NextCardResponse"
+              examples:
+                next_card_available:
+                  value:
+                    ok: true
+                    data:
+                      card:
+                        id: 1
+                        front: "Welcome"
+                        back: "Willkommen"
+                      deck:
+                        id: 1
+                        name: "Deck 1"
+                no_next_card:
+                  value:
+                    ok: true
+                    data:
+                      card: null
+                      deck:
+                        id: 1
+                        name: "Deck 1"
+        "404":
+          description: Deck not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                ok: false
+                message: "Deck not found"
+                code: "not_found"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /deck/{deck_id}/reset:
+    post:
+      tags: [Decks]
+      summary: Reset a deck progress
+      operationId: resetDeck
+      parameters:
+        - name: deck_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiSuccessBase"
+              example:
+                ok: true
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /request-code:
+    post:
+      tags: [Login]
+      summary: Request a new code for authentication
+      operationId: requestCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiSuccessBase"
+              example:
+                ok: true
+                message: "Login code sent successfully"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                ok: false
+                message: "Parameter `email` is required"
+                code: "validation_error"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                ok: false
+                message: "User not found"
+                code: "not_found"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /login:
+    post:
+      tags: [Login]
+      summary: Login with email and code
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - code
+              properties:
+                email:
+                  type: string
+                  format: email
+                code:
+                  type: string
+                  pattern: "^[0-9]{6}$"
+                  minLength: 6
+                  maxLength: 6
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiSuccessBase"
+              example:
+                ok: true
+                message: "Logged in successfully"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                ok: false
+                message: "Parameters `email` and `code` are required"
+                code: "validation_error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              examples:
+                invalid_code:
+                  value:
+                    ok: false
+                    message: "Invalid code"
+                    code: "unauthorized"
+                expired_code:
+                  value:
+                    ok: false
+                    message: "Invalid or expired code"
+                    code: "unauthorized"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                ok: false
+                message: "User not found"
+                code: "not_found"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /logout:
+    post:
+      tags: [Login]
+      summary: Logout the user
+      operationId: logout
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiSuccessBase"
+              example:
+                ok: true
+                message: "Logged out successfully"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
